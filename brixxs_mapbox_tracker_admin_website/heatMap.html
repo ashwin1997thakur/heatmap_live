@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Create a heatmap layer</title>
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="map"></div>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+      import {
+        getFirestore,
+        doc,
+        getDoc,
+        getDocs,
+        query,
+        onSnapshot,
+        collection,
+        addDoc,
+      } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyDWVn-SJ7cDHcaSn8WhIKlAHwBHZlXGArU",
+        authDomain: "brixxsmapbox-ece1d.firebaseapp.com",
+        projectId: "brixxsmapbox-ece1d",
+        storageBucket: "brixxsmapbox-ece1d.appspot.com",
+        messagingSenderId: "765326453032",
+        appId: "1:765326453032:web:4122c078252a52ea6b081d",
+        measurementId: "G-FNWWNQ1FTY",
+      };
+      mapboxgl.accessToken =
+        "pk.eyJ1IjoiZGV2ZWxvcG1lbnQxIiwiYSI6ImNreDduNGZiNDA4M2cyb3FjaHdkMzRmOTAifQ.rmaNEeyqCmavn7PbFTSzmw";
+      var map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/dark-v10",
+      });
+      // = new mapboxgl.Map({
+      //   container: "map",
+      //   style: "mapbox://styles/mapbox/dark-v10",
+      //   center: [75.8651116, 22.753421],
+      //   //zoom: 20,
+      // });
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore();
+      const userNameList = [];
+      const userNameListSubCollection = [];
+      var listofuser;
+      var uniqueLayerId = "";
+      var counter = 0;
+      var colorCode = [
+        "#FF5733",
+        "#EBFA00",
+        "#0DF9EE",
+        "#0F35F4",
+        "#64646C",
+        "#FE8F09",
+      ];
+
+      navigator.geolocation.getCurrentPosition((position) => {
+        console.log("Current Location latitude");
+        console.log(position.coords.latitude);
+
+        map = new mapboxgl.Map({
+          container: "map",
+          style: "mapbox://styles/mapbox/dark-v10",
+          center: [position.coords.longitude, position.coords.latitude],
+          zoom: 15,
+        });
+
+        // map.center = [position.coords.latitude,position.coords.longitude];
+      });
+
+      map.on("load", async () => {
+        var docsSnapFullData = [];
+        counter = 0;
+        var latitude;
+        var longitude;
+
+        const docsSnap = await getDocs(collection(db, "collection"));
+        docsSnap.forEach((doc) => {
+          console.log(doc.data()["userName"]);
+
+          userNameList[counter] = doc.data()["userName"];
+          userNameListSubCollection[counter] = doc.data()["userName"] + "123";
+          counter = counter + 1;
+          console.log("Counter Value ----------- " + counter);
+        });
+
+        counter = 0;
+
+        for (let i = 0; i < userNameList.length; i++) {
+          uniqueLayerId = userNameList[i];
+          const docsSnap2 = await getDocs(
+            collection(
+              db,
+              `collection/${userNameList[i]}/${userNameList[i]}${"123"}`
+            )
+          );
+
+          docsSnap2.forEach((doc) => {
+            docsSnapFullData[counter] = doc.data();
+            counter = counter + 1;
+          });
+
+          var geojson = {
+            type: "FeatureCollection",
+            features: [],
+          };
+          console.log("Item Length" + docsSnapFullData.length);
+          for (let j = 0; j < docsSnapFullData.length; j++) {
+            geojson.features.push({
+              type: "Feature",
+              properties: {
+                color: colorCode[i], // red
+              },
+              geometry: {
+                type: "Point",
+                coordinates: [
+                  docsSnapFullData[j].long,
+                  docsSnapFullData[j].lat,
+                ],
+              },
+            });
+          }
+          console.log("i------------------", i);
+          // if(i == 0){
+          map.addSource("earthquakes" + i, {
+            type: "geojson",
+            data: geojson,
+            // "https://docs.mapbox.com/mapbox-gl-js/assets/earthquakes.geojson",
+          });
+          // }
+
+          map.addLayer(
+            {
+              id: "earthquakes-heat" + i,
+              type: "heatmap",
+              source: "earthquakes" + i,
+              paint: {
+                "heatmap-radius": {
+                  base: 2,
+                  stops: [
+                    [10, 2],
+                    [19, 20],
+                  ],
+                },
+              },
+            },
+            "waterway-label"
+          );
+
+      
+        }
+      });
+    </script>
+  </body>
+</html>

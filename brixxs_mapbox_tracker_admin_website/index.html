@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Locate the user</title>
+    <meta
+      name="viewport"
+      content="initial-scale=1,maximum-scale=1,user-scalable=no"
+    />
+    <link
+      href="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.css"
+      rel="stylesheet"
+    />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="map" class="map"></div>
+    <script type="module">
+      const marker = [];
+      var counter = 0;
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+      import {
+        getFirestore,
+        doc,
+        getDoc,
+        getDocs,
+        query,
+        onSnapshot,
+        collection,
+        addDoc,
+      } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyDWVn-SJ7cDHcaSn8WhIKlAHwBHZlXGArU",
+        authDomain: "brixxsmapbox-ece1d.firebaseapp.com",
+        projectId: "brixxsmapbox-ece1d",
+        storageBucket: "brixxsmapbox-ece1d.appspot.com",
+        messagingSenderId: "765326453032",
+        appId: "1:765326453032:web:4122c078252a52ea6b081d",
+        measurementId: "G-FNWWNQ1FTY",
+      };
+      mapboxgl.accessToken =
+        "pk.eyJ1IjoiZGV2ZWxvcG1lbnQxIiwiYSI6ImNreDduNGZiNDA4M2cyb3FjaHdkMzRmOTAifQ.rmaNEeyqCmavn7PbFTSzmw";
+      var map = new mapboxgl.Map({
+        container: "map",
+        style: "mapbox://styles/mapbox/dark-v10",
+        // center: [75.8651116, 22.753421],
+        // zoom: 20,
+      });
+      // var map = new mapboxgl.Map({container: "map",
+      //    style: "mapbox://styles/mapbox/streets-v11"});
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore();
+      let userNameList = [];
+      let userNameListSubCollection = [];
+      var listofuser;
+      var counter = 0;
+      var FullUserNameList = [];
+      let docsSnapFullData = [[]];
+      var latitude;
+      var longitude;
+      var currentMarkers = [];
+      let docsSnap2 = [];
+      var oneobjectThatHoldData = [];
+      var colorCode = [
+        "#FF5733",
+        "#EBFA00",
+        "#0DF9EE",
+        "#0F35F4",
+        "#64646C",
+        "#FE8F09",
+      ];
+
+      navigator.geolocation.getCurrentPosition((position) => {
+        console.log("Current Location latitude");
+        console.log(position.coords.latitude);
+
+        map = new mapboxgl.Map({
+          container: "map",
+          style: "mapbox://styles/mapbox/dark-v10",
+          center: [position.coords.longitude,position.coords.latitude],
+          zoom: 20,
+        });
+
+        // map.center = [position.coords.latitude,position.coords.longitude];
+      });
+
+      map.on("load", async () => {
+        await getLocation();
+
+        FullUserNameList = [];
+        userNameList = [];
+        userNameListSubCollection = [];
+        currentMarkers = [];
+        async function getLocation() {
+          const docsSnap = await getDocs(collection(db, "collection"));
+          docsSnap.forEach((doc) => {
+            console.log(doc.data());
+            userNameList[counter] = doc.data()["userName"];
+            userNameListSubCollection[counter] = doc.data()["userName"] + "123";
+            FullUserNameList[counter] = doc.data();
+            counter = counter + 1;
+          });
+
+          counter = 0;
+
+          for (let i = 0; i < FullUserNameList.length; i++) {
+            docsSnap2[i] = await getDocs(
+              collection(
+                db,
+                `collection/${userNameList[i]}/${userNameListSubCollection[i]}`
+              )
+            );
+
+            docsSnap2[i].forEach((doc) => {
+              var temp;
+              temp = [
+                Number(`${doc.data().long}`),
+                Number(`${doc.data().lat}`),
+              ];
+              docsSnapFullData.push(temp);
+              counter = counter + 1;
+            });
+
+            oneobjectThatHoldData[i] = docsSnapFullData;
+            docsSnapFullData = [];
+          }
+
+          var geojsonDataFeature = [];
+
+          var geojsonData = {
+            type: "geojson",
+            data: {
+              type: "FeatureCollection",
+              features: [],
+            },
+          };
+          for (var j = 0; j < userNameList.length; j++) {
+            geojsonData.data.features.push({
+              type: "Feature",
+              properties: {
+                color: colorCode[j], // red
+              },
+              geometry: {
+                type: "LineString",
+                coordinates: oneobjectThatHoldData[j],
+              },
+            });
+          }
+
+          var temp = [
+            {
+              type: "Feature",
+              properties: {
+                color: colorCode[0], // red
+              },
+              geometry: {
+                type: "LineString",
+                coordinates: oneobjectThatHoldData[0],
+              },
+            },
+            {
+              type: "Feature",
+              properties: {
+                color: colorCode[1], // blue
+              },
+              geometry: {
+                type: "LineString",
+                coordinates: oneobjectThatHoldData[1],
+              },
+            },
+          ];
+
+          console.log(temp);
+
+          console.log(geojsonDataFeature);
+
+          map.addSource("lines", geojsonData);
+
+          map.addLayer({
+            id: "lines",
+            type: "line",
+            source: "lines",
+            paint: {
+              "line-width": 5,
+              "line-color": ["get", "color"],
+            },
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
